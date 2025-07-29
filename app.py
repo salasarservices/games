@@ -128,7 +128,9 @@ def show_summary():
     if st.button("🔁 Play Again"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.experimental_rerun()
+        st.session_state.refresh = True
+st.session_state.run_id = random.randint(0, 999999)  # force re-render
+
 
 # Title and Start
 st.markdown(f"<h1 style='color:{PRIMARY};'>Suraksha Sathi – Your Life in 5 Cards</h1>", unsafe_allow_html=True)
@@ -137,5 +139,11 @@ if not st.session_state.started:
     st.markdown("💡 Make insurance choices for 5 real-life events. Your goal: retain as much of your ₹1,00,000 as possible.")
     if st.button("Start Game"):
         start_game()
+if "refresh" not in st.session_state:
+    st.session_state.refresh = False
 else:
     play_game()
+    if st.session_state.refresh:
+    st.session_state.refresh = False
+    st.experimental_rerun()
+
