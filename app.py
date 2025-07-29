@@ -20,6 +20,7 @@ st.markdown("""
         text-align: center;
         margin-bottom: 2rem;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        color: #000000;
     }
     
     .scenario-card {
@@ -29,6 +30,7 @@ st.markdown("""
         border-left: 5px solid #FF9800;
         margin-bottom: 1.5rem;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        color: #000000;
     }
     
     .choice-card {
@@ -39,6 +41,7 @@ st.markdown("""
         margin: 1rem 0;
         transition: all 0.3s ease;
         cursor: pointer;
+        color: #000000;
     }
     
     .choice-card:hover {
@@ -52,6 +55,7 @@ st.markdown("""
         padding: 1.5rem;
         border-radius: 15px;
         margin-bottom: 2rem;
+        color: #000000;
     }
     
     .result-good {
@@ -60,6 +64,7 @@ st.markdown("""
         border-radius: 10px;
         padding: 1.5rem;
         margin: 1rem 0;
+        color: #000000;
     }
     
     .result-bad {
@@ -68,6 +73,7 @@ st.markdown("""
         border-radius: 10px;
         padding: 1.5rem;
         margin: 1rem 0;
+        color: #000000;
     }
     
     .final-grade {
@@ -80,8 +86,18 @@ st.markdown("""
     .hindi-text {
         font-family: 'Noto Sans Devanagari', sans-serif;
         font-size: 1.1rem;
-        color: #666;
+        color: #333333;
         font-style: italic;
+    }
+    
+    /* Fix button text color */
+    .stButton > button {
+        color: #000000 !important;
+    }
+    
+    /* Ensure all text is black */
+    .stMarkdown, .stText, p, h1, h2, h3, h4, h5, h6 {
+        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -103,8 +119,8 @@ scenarios = [
     {
         'title': '🏠 अपना घर - Dream Home Purchase',
         'hindi_title': 'सपनों का घर खरीदना',
-        'text': '''Congratulations! You've saved enough to buy your dream 2BHK flat in Mumbai for ₹50 lakhs! 
-        Your family is excited, but Mama ji warns: "Beta, Mumbai mein anything can happen - floods, earthquakes, theft!"
+        'text': '''Congratulations! You've saved enough to buy your dream 2BHK flat in Delhi for ₹50 lakhs! 
+        Your family is excited, but Mama ji warns: "Beta, Delhi mein anything can happen - floods, earthquakes, theft!"
         
         What home insurance will you choose to protect your family's biggest investment?''',
         'choices': [
@@ -134,19 +150,19 @@ scenarios = [
             }
         ],
         'event': {
-            'title': '🌊 Mumbai Floods Strike!',
+            'title': '🌊 Delhi Floods Strike!',
             'description': '''Heavy monsoon rains flood your building! Water damage ruins furniture, 
             electronics, and requires major repairs. Your neighbors are devastated.
             
             Total damage: ₹4 lakh''',
-            'hindi': 'मुंबई में बाढ़ - भारी नुकसान!',
+            'hindi': 'दिल्ली में बाढ़ - भारी नुकसान!',
             'damage': 400000
         }
     },
     {
         'title': '🏍️ नई बाइक - Two-Wheeler Dreams',
         'hindi_title': 'नई मोटरसाइकिल',
-        'text': '''You've bought a shiny new Royal Enfield worth ₹2.5 lakhs! Perfect for those weekend rides to Lonavala.
+        'text': '''You've bought a shiny new Royal Enfield worth ₹2.5 lakhs! Perfect for those weekend rides to Gurgaon.
         
         But Papa reminds you: "Beta, Delhi traffic is crazy! And what about accidents?"
         
@@ -484,10 +500,11 @@ def main():
                 make_choice(i)
                 st.rerun()
     
-    # Show choice result
-    elif st.session_state.game_state['choice_made'] and not st.session_state.game_state['event_shown']:
+    # Show choice result and event
+    elif st.session_state.game_state['choice_made']:
         choice = st.session_state.selected_choice
         
+        # Show choice confirmation
         st.markdown(f"""
         <div class="result-good">
             <h3>✅ Decision Made! / फैसला हो गया!</h3>
@@ -498,43 +515,40 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        if st.button("⏭️ See What Happens Next / आगे देखें क्या होता है", type="primary"):
-            st.rerun()
-    
-    # Show event result
-    elif st.session_state.game_state['event_shown']:
-        event, covered, out_of_pocket = show_event()
-        
-        result_class = "result-good" if out_of_pocket == 0 else "result-bad"
-        
-        st.markdown(f"""
-        <div class="{result_class}">
-            <h3>{event['title']}</h3>
-            <p style="font-size: 1.1rem; margin-bottom: 1rem;">{event['description']}</p>
-            <p><em>{event['hindi']}</em></p>
+        # Show event immediately if not shown yet
+        if not st.session_state.game_state['event_shown']:
+            # Add a small delay for better UX
+            with st.spinner("देखते हैं क्या होता है... / Let's see what happens..."):
+                time.sleep(1)
             
-            <hr style="margin: 1rem 0;">
-            
-            <p><strong>💸 Total Cost:</strong> {format_currency(event['damage'])}</p>
-            <p><strong>🛡️ Insurance Covered:</strong> {format_currency(covered)}</p>
-            <p><strong>💰 You Pay:</strong> {format_currency(out_of_pocket)}</p>
-            
-            {"<p><strong>🎉 Fully covered by insurance! / बीमा ने पूरा कवर किया!</strong></p>" if out_of_pocket == 0 else ""}
-            {"<p><strong>💸 This is a major financial hit! / यह बड़ा नुकसान है!</strong></p>" if out_of_pocket > 200000 else ""}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("➡️ Next Scenario / अगली स्थिति", type="primary", use_container_width=True):
-                next_scenario()
-                st.rerun()
-    
-    else:
-        # This handles the case where event needs to be shown
-        if st.session_state.game_state['choice_made']:
+            # Show the event
             event, covered, out_of_pocket = show_event()
-            st.rerun()
+            
+            result_class = "result-good" if out_of_pocket == 0 else "result-bad"
+            
+            st.markdown(f"""
+            <div class="{result_class}">
+                <h3>{event['title']}</h3>
+                <p style="font-size: 1.1rem; margin-bottom: 1rem;">{event['description']}</p>
+                <p><em>{event['hindi']}</em></p>
+                
+                <hr style="margin: 1rem 0;">
+                
+                <p><strong>💸 Total Cost:</strong> {format_currency(event['damage'])}</p>
+                <p><strong>🛡️ Insurance Covered:</strong> {format_currency(covered)}</p>
+                <p><strong>💰 You Pay:</strong> {format_currency(out_of_pocket)}</p>
+                
+                {"<p><strong>🎉 Fully covered by insurance! / बीमा ने पूरा कवर किया!</strong></p>" if out_of_pocket == 0 else ""}
+                {"<p><strong>💸 This is a major financial hit! / यह बड़ा नुकसान है!</strong></p>" if out_of_pocket > 200000 else ""}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Show next button
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col2:
+                if st.button("➡️ Next Scenario / अगली स्थिति", type="primary", use_container_width=True):
+                    next_scenario()
+                    st.rerun()
 
     # Restart button in sidebar
     with st.sidebar:
