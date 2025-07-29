@@ -12,11 +12,13 @@ INFO = "#459fda"
 # Initialize session state
 if "started" not in st.session_state:
     st.session_state.started = False
-    st.session_state.balance = 100000  # Starting balance
+    st.session_state.balance = 100000
     st.session_state.card_index = 0
     st.session_state.results = []
+    st.session_state.refresh = False
+    st.session_state.just_ran = False
 
-# Define 5 real-life Indian middle-class scenarios
+# Define scenarios
 scenarios = [
     {
         "title": "🩺 Health Scare: Emergency Hospitalization",
@@ -71,6 +73,7 @@ def start_game():
     st.session_state.balance = 100000
     st.session_state.card_index = 0
     st.session_state.results = []
+    st.session_state.just_ran = False
 
 # Game UI
 def play_game():
@@ -96,9 +99,7 @@ def play_game():
                 "remaining": st.session_state.balance
             })
             st.session_state.card_index += 1
-            st.experimental_rerun()
-    else:
-        show_summary()
+            st.session_state.refresh = True
 
 # Final Summary
 def show_summary():
@@ -128,9 +129,7 @@ def show_summary():
     if st.button("🔁 Play Again"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.session_state.refresh = True
-st.session_state.run_id = random.randint(0, 999999)  # force re-render
-
+        st.experimental_rerun()
 
 # Title and Start
 st.markdown(f"<h1 style='color:{PRIMARY};'>Suraksha Sathi – Your Life in 5 Cards</h1>", unsafe_allow_html=True)
@@ -139,11 +138,12 @@ if not st.session_state.started:
     st.markdown("💡 Make insurance choices for 5 real-life events. Your goal: retain as much of your ₹1,00,000 as possible.")
     if st.button("Start Game"):
         start_game()
-if "refresh" not in st.session_state:
-    st.session_state.refresh = False
 else:
-    play_game()
     if st.session_state.refresh:
-    st.session_state.refresh = False
-    st.experimental_rerun()
-
+        st.session_state.refresh = False
+        st.experimental_rerun()
+    elif not st.session_state.just_ran:
+        play_game()
+        st.session_state.just_ran = True
+    elif st.session_state.card_index >= len(scenarios):
+        show_summary()
