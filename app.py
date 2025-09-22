@@ -1,149 +1,114 @@
 import streamlit as st
 import random
 
-# Page config
-st.set_page_config(page_title="Suraksha Sathi – Life in 5 Cards", layout="centered")
+# Grid size
+WIDTH = 10
+HEIGHT = 20
 
-# Theme colors
-PRIMARY = "#2d448d"
-SUCCESS = "#a6ce39"
-INFO = "#459fda"
+# Emojis/colors
+PLANE = "✈️"
+ENEMY = "💀"
+BULLET = "🔴"
+EMPTY = "⬛"
 
-# Initialize session state
-if "started" not in st.session_state:
-    st.session_state.started = False
-    st.session_state.balance = 100000
-    st.session_state.card_index = 0
-    st.session_state.results = []
-    st.session_state.refresh = False
-    st.session_state.just_ran = False
+# Initialize game state
+if 'plane_x' not in st.session_state:
+    st.session_state.plane_x = WIDTH // 2
+    st.session_state.bullets = []
+    st.session_state.enemies = []
+    st.session_state.score = 0
+    st.session_state.running = True
 
-# Define scenarios
-scenarios = [
-    {
-        "title": "🩺 Health Scare: Emergency Hospitalization",
-        "cost": 60000,
-        "insurance": {
-            "Mediclaim (₹5,000 premium)": {"premium": 5000, "out_of_pocket": 10000},
-            "Super Top-Up (₹8,000 premium)": {"premium": 8000, "out_of_pocket": 2000},
-            "No Insurance": {"premium": 0, "out_of_pocket": 60000},
-        }
-    },
-    {
-        "title": "🚗 Car Accident: Bumper Repair & Liability",
-        "cost": 40000,
-        "insurance": {
-            "Third-Party Only (₹2,000)": {"premium": 2000, "out_of_pocket": 30000},
-            "Comprehensive (₹6,000)": {"premium": 6000, "out_of_pocket": 5000},
-            "No Insurance": {"premium": 0, "out_of_pocket": 40000},
-        }
-    },
-    {
-        "title": "🏠 Fire at Home: Kitchen Damage",
-        "cost": 70000,
-        "insurance": {
-            "Fire-Only Cover (₹3,000)": {"premium": 3000, "out_of_pocket": 20000},
-            "Home Insurance (₹7,000)": {"premium": 7000, "out_of_pocket": 5000},
-            "No Insurance": {"premium": 0, "out_of_pocket": 70000},
-        }
-    },
-    {
-        "title": "💼 Job Loss: Income Halt for 3 Months",
-        "cost": 90000,
-        "insurance": {
-            "Income Protection (₹4,000)": {"premium": 4000, "out_of_pocket": 30000},
-            "EMI Waiver Policy (₹5,000)": {"premium": 5000, "out_of_pocket": 20000},
-            "No Insurance": {"premium": 0, "out_of_pocket": 90000},
-        }
-    },
-    {
-        "title": "⚰️ Sudden Death in Family: Funeral & Legal Costs",
-        "cost": 100000,
-        "insurance": {
-            "Term Life Cover (₹6,000)": {"premium": 6000, "out_of_pocket": 10000},
-            "Term + Accidental Rider (₹8,000)": {"premium": 8000, "out_of_pocket": 5000},
-            "No Insurance": {"premium": 0, "out_of_pocket": 100000},
-        }
-    }
-]
+def reset_game():
+    st.session_state.plane_x = WIDTH // 2
+    st.session_state.bullets = []
+    st.session_state.enemies = []
+    st.session_state.score = 0
+    st.session_state.running = True
 
-# Start Game
-def start_game():
-    st.session_state.started = True
-    st.session_state.balance = 100000
-    st.session_state.card_index = 0
-    st.session_state.results = []
-    st.session_state.just_ran = False
+def move_plane(dx):
+    x = st.session_state.plane_x + dx
+    if 0 <= x < WIDTH:
+        st.session_state.plane_x = x
 
-# Game UI
-def play_game():
-    index = st.session_state.card_index
-    if index < len(scenarios):
-        scenario = scenarios[index]
-        st.markdown(f"### {scenario['title']}")
-        st.write(f"**Estimated Loss:** ₹{scenario['cost']}")
+def shoot():
+    # Bullets start just above the plane
+    st.session_state.bullets.append([st.session_state.plane_x, HEIGHT-2])
 
-        choice = st.radio("Choose your insurance option:",
-                          options=list(scenario["insurance"].keys()),
-                          key=f"choice_{index}")
+def next_frame():
+    # Move bullets
+    new_bullets = []
+    for bx, by in st.session_state.bullets:
+        by -= 1
+        if by >= 0:
+            new_bullets.append([bx, by])
+    st.session_state.bullets = new_bullets
 
-        if st.button("Confirm Choice", key=f"confirm_{index}"):
-            selected = scenario["insurance"][choice]
-            total_loss = selected["premium"] + selected["out_of_pocket"]
-            st.session_state.balance -= total_loss
-            st.session_state.results.append({
-                "title": scenario["title"],
-                "choice": choice,
-                "premium": selected["premium"],
-                "out_of_pocket": selected["out_of_pocket"],
-                "remaining": st.session_state.balance
-            })
-            st.session_state.card_index += 1
-            st.session_state.refresh = True
+    # Move enemies
+    new_enemies = []
+    for ex, ey in st.session_state.enemies:
+        ey += 1
+        if ey < HEIGHT:
+            new_enemies.append([ex, ey])
+    st.session_state.enemies = new_enemies
 
-# Final Summary
-def show_summary():
-    st.markdown("## 🧾 Game Summary")
-    for res in st.session_state.results:
-        with st.container():
-            st.markdown(f"**{res['title']}**")
-            st.markdown(f"- Insurance Chosen: `{res['choice']}`")
-            st.markdown(f"- Premium Paid: ₹{res['premium']}")
-            st.markdown(f"- Out-of-pocket Cost: ₹{res['out_of_pocket']}")
-            st.markdown(f"- Remaining Balance: ₹{res['remaining']}")
-            st.markdown("---")
+    # Spawn new enemies
+    if random.random() < 0.2:
+        st.session_state.enemies.append([random.randint(0, WIDTH-1), 0])
 
-    final = st.session_state.balance
-    st.subheader(f"🏁 Final Balance: ₹{final}")
-    if final > 80000:
-        grade = "A+ – Excellent risk manager! 🎉"
-    elif final > 60000:
-        grade = "B – Pretty good decisions!"
-    elif final > 30000:
-        grade = "C – Took some risk, but survived!"
-    else:
-        grade = "D – Oops! Insurance matters."
+    # Collision: bullets vs enemies
+    bullets_to_remove = []
+    enemies_to_remove = []
+    for i, (bx, by) in enumerate(st.session_state.bullets):
+        for j, (ex, ey) in enumerate(st.session_state.enemies):
+            if bx == ex and by == ey:
+                bullets_to_remove.append(i)
+                enemies_to_remove.append(j)
+                st.session_state.score += 1
 
-    st.markdown(f"### 🎓 Grade: **{grade}**")
+    # Remove collided bullets and enemies
+    st.session_state.bullets = [b for i, b in enumerate(st.session_state.bullets) if i not in bullets_to_remove]
+    st.session_state.enemies = [e for j, e in enumerate(st.session_state.enemies) if j not in enemies_to_remove]
 
-    if st.button("🔁 Play Again"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.experimental_rerun()
+    # Collision: enemies reach plane
+    for ex, ey in st.session_state.enemies:
+        if ey == HEIGHT-1 and ex == st.session_state.plane_x:
+            st.session_state.running = False
 
-# Title and Start
-st.markdown(f"<h1 style='color:{PRIMARY};'>Suraksha Sathi – Your Life in 5 Cards</h1>", unsafe_allow_html=True)
+def render():
+    grid = [[EMPTY for _ in range(WIDTH)] for _ in range(HEIGHT)]
+    for bx, by in st.session_state.bullets:
+        if 0 <= by < HEIGHT:
+            grid[by][bx] = BULLET
+    for ex, ey in st.session_state.enemies:
+        if 0 <= ey < HEIGHT:
+            grid[ey][ex] = ENEMY
+    # Place plane
+    grid[HEIGHT-1][st.session_state.plane_x] = PLANE
+    # Render grid
+    for row in grid:
+        st.markdown("".join(row))
+    st.write(f"Score: {st.session_state.score}")
 
-if not st.session_state.started:
-    st.markdown("💡 Make insurance choices for 5 real-life events. Your goal: retain as much of your ₹1,00,000 as possible.")
-    if st.button("Start Game"):
-        start_game()
+st.title("✈️ Retro Flight Shooter")
+if not st.session_state.running:
+    st.subheader("Game Over!")
+    if st.button("Restart"):
+        reset_game()
 else:
-    if st.session_state.refresh:
-        st.session_state.refresh = False
-        st.experimental_rerun()
-    elif not st.session_state.just_ran:
-        play_game()
-        st.session_state.just_ran = True
-    elif st.session_state.card_index >= len(scenarios):
-        show_summary()
+    # Controls
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.button("⬅️"):
+            move_plane(-1)
+    with col2:
+        if st.button("➡️"):
+            move_plane(1)
+    with col3:
+        if st.button("🔫 Shoot"):
+            shoot()
+    with col4:
+        if st.button("Next Frame"):
+            next_frame()
+
+    render()
