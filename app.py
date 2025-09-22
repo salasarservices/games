@@ -1,114 +1,135 @@
-import streamlit as st
 import random
+from kivy.app import App
+from kivy.uix.widget import Widget
+from kivy.clock import Clock
+from kivy.graphics import Color, Rectangle
+from kivy.core.window import Window
+from kivy.uix.label import Label
 
-# Grid size
-WIDTH = 10
-HEIGHT = 20
+# Constants
+WIDTH, HEIGHT = 400, 700
+Window.size = (WIDTH, HEIGHT)
+PLANE_SIZE = (40, 40)
+ENEMY_SIZE = (40, 40)
+BULLET_SIZE = (6, 20)
 
-# Emojis/colors
-PLANE = "✈️"
-ENEMY = "💀"
-BULLET = "🔴"
-EMPTY = "⬛"
+class Plane(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size = PLANE_SIZE
+        self.center_x = WIDTH // 2
+        self.y = 30
 
-# Initialize game state
-if 'plane_x' not in st.session_state:
-    st.session_state.plane_x = WIDTH // 2
-    st.session_state.bullets = []
-    st.session_state.enemies = []
-    st.session_state.score = 0
-    st.session_state.running = True
+class Enemy(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.size = ENEMY_SIZE
+        self.x = random.randint(0, WIDTH - ENEMY_SIZE[0])
+        self.y = HEIGHT
+        with self.canvas:
+            Color(random.random(), random.random(), random.random())
+            self.rect = Rectangle(pos=self.pos, size=self.size)
 
-def reset_game():
-    st.session_state.plane_x = WIDTH // 2
-    st.session_state.bullets = []
-    st.session_state.enemies = []
-    st.session_state.score = 0
-    st.session_state.running = True
+    def move(self):
+        self.y -= 5
+        self.rect.pos = self.pos
 
-def move_plane(dx):
-    x = st.session_state.plane_x + dx
-    if 0 <= x < WIDTH:
-        st.session_state.plane_x = x
+class Bullet(Widget):
+    def __init__(self, x, y, **kwargs):
+        super().__init__(**kwargs)
+        self.size = BULLET_SIZE
+        self.x = x + PLANE_SIZE[0] // 2 - BULLET_SIZE[0] // 2
+        self.y = y + PLANE_SIZE[1]
+        with self.canvas:
+            Color(1, 0, 0)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
 
-def shoot():
-    # Bullets start just above the plane
-    st.session_state.bullets.append([st.session_state.plane_x, HEIGHT-2])
+    def move(self):
+        self.y += 15
+        self.rect.pos = self.pos
 
-def next_frame():
-    # Move bullets
-    new_bullets = []
-    for bx, by in st.session_state.bullets:
-        by -= 1
-        if by >= 0:
-            new_bullets.append([bx, by])
-    st.session_state.bullets = new_bullets
+class GameWidget(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.plane = Plane()
+        self.add_widget(self.plane)
+        self.enemies = []
+        self.bullets = []
+        self.score = 0
+        self.label = Label(text=f"Score: {self.score}", pos=(10, HEIGHT - 40), size_hint=(None, None), color=(1,1,0,1))
+        self.add_widget(self.label)
+        Clock.schedule_interval(self.update, 1/30)
+        self._keyboard = Window.request_keyboard(self._on_keyboard_closed, self)
+        if self._keyboard.widget:
+            pass
+        self._keyboard.bind(on_key_down=self.on_key_down)
+        self.spawn_enemy()
 
-    # Move enemies
-    new_enemies = []
-    for ex, ey in st.session_state.enemies:
-        ey += 1
-        if ey < HEIGHT:
-            new_enemies.append([ex, ey])
-    st.session_state.enemies = new_enemies
+    def _on_keyboard_closed(self):
+        self._keyboard.unbind(on_key_down=self.on_key_down)
+        self._keyboard = None
 
-    # Spawn new enemies
-    if random.random() < 0.2:
-        st.session_state.enemies.append([random.randint(0, WIDTH-1), 0])
+    def on_touch_move(self, touch):
+        self.plane.center_x = touch.x
 
-    # Collision: bullets vs enemies
-    bullets_to_remove = []
-    enemies_to_remove = []
-    for i, (bx, by) in enumerate(st.session_state.bullets):
-        for j, (ex, ey) in enumerate(st.session_state.enemies):
-            if bx == ex and by == ey:
-                bullets_to_remove.append(i)
-                enemies_to_remove.append(j)
-                st.session_state.score += 1
+    def on_touch_down(self, touch):
+        self.shoot()
 
-    # Remove collided bullets and enemies
-    st.session_state.bullets = [b for i, b in enumerate(st.session_state.bullets) if i not in bullets_to_remove]
-    st.session_state.enemies = [e for j, e in enumerate(st.session_state.enemies) if j not in enemies_to_remove]
+    def on_key_down(self, keyboard, keycode, text, modifiers):
+        if keycode[1] == 'left':
+            self.plane.x = max(0, self.plane.x - 20)
+        elif keycode[1] == 'right':
+            self.plane.x = min(WIDTH - PLANE_SIZE[0], self.plane.x + 20)
+        elif keycode[1] == 'spacebar':
+            self.shoot()
+        return True
 
-    # Collision: enemies reach plane
-    for ex, ey in st.session_state.enemies:
-        if ey == HEIGHT-1 and ex == st.session_state.plane_x:
-            st.session_state.running = False
+    def spawn_enemy(self):
+        enemy = Enemy()
+        self.enemies.append(enemy)
+        self.add_widget(enemy)
+        Clock.schedule_once(lambda dt: self.spawn_enemy(), random.uniform(0.7, 1.5))
 
-def render():
-    grid = [[EMPTY for _ in range(WIDTH)] for _ in range(HEIGHT)]
-    for bx, by in st.session_state.bullets:
-        if 0 <= by < HEIGHT:
-            grid[by][bx] = BULLET
-    for ex, ey in st.session_state.enemies:
-        if 0 <= ey < HEIGHT:
-            grid[ey][ex] = ENEMY
-    # Place plane
-    grid[HEIGHT-1][st.session_state.plane_x] = PLANE
-    # Render grid
-    for row in grid:
-        st.markdown("".join(row))
-    st.write(f"Score: {st.session_state.score}")
+    def shoot(self):
+        bullet = Bullet(self.plane.x, self.plane.y)
+        self.bullets.append(bullet)
+        self.add_widget(bullet)
 
-st.title("✈️ Retro Flight Shooter")
-if not st.session_state.running:
-    st.subheader("Game Over!")
-    if st.button("Restart"):
-        reset_game()
-else:
-    # Controls
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.button("⬅️"):
-            move_plane(-1)
-    with col2:
-        if st.button("➡️"):
-            move_plane(1)
-    with col3:
-        if st.button("🔫 Shoot"):
-            shoot()
-    with col4:
-        if st.button("Next Frame"):
-            next_frame()
+    def update(self, dt):
+        # Move bullets
+        for bullet in self.bullets[:]:
+            bullet.move()
+            if bullet.y > HEIGHT:
+                self.remove_widget(bullet)
+                self.bullets.remove(bullet)
 
-    render()
+        # Move enemies
+        for enemy in self.enemies[:]:
+            enemy.move()
+            if enemy.y < 0:
+                self.remove_widget(enemy)
+                self.enemies.remove(enemy)
+                continue
+            # Collision
+            for bullet in self.bullets[:]:
+                if enemy.collide_widget(bullet):
+                    self.remove_widget(enemy)
+                    self.remove_widget(bullet)
+                    self.enemies.remove(enemy)
+                    self.bullets.remove(bullet)
+                    self.score += 1
+                    self.label.text = f"Score: {self.score}"
+                    break
+            if enemy.collide_widget(self.plane):
+                self.end_game()
+
+    def end_game(self):
+        Clock.unschedule(self.update)
+        self.label.text = f"Game Over! Final Score: {self.score}"
+
+class FlightShooterApp(App):
+    def build(self):
+        return GameWidget()
+
+if __name__ == '__main__':
+    FlightShooterApp().run()
